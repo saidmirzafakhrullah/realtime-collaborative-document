@@ -4,54 +4,30 @@ namespace App\Events;
 
 use App\Models\Document;
 use Illuminate\Broadcasting\Channel;
-use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 class DocumentUpdated implements ShouldBroadcastNow
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, SerializesModels;
 
-    public Document $document;
+    public $documentId;
+    public $content;
 
-    /**
-     * Create a new event instance.
-     */
-    public function __construct(Document $document)
+    public function __construct(Document $document, $content)
     {
-        $this->document = $document;
+        $this->documentId = $document->id;
+        $this->content = $content;
     }
 
-    /**
-     * Channel yang akan dibroadcast.
-     */
-    public function broadcastOn(): array
+    public function broadcastOn(): Channel
     {
-        return [
-            new Channel('document.' . $this->document->id),
-        ];
+        return new Channel('document.' . $this->documentId);
     }
 
-    /**
-     * Nama event di frontend.
-     */
     public function broadcastAs(): string
     {
         return 'document.updated';
-    }
-
-    /**
-     * Data yang dikirim ke frontend.
-     */
-    public function broadcastWith(): array
-    {
-        return [
-            'id' => $this->document->id,
-            'title' => $this->document->title,
-            'content' => $this->document->content,
-            'user_id' => $this->document->user_id,
-            'updated_at' => $this->document->updated_at,
-        ];
     }
 }

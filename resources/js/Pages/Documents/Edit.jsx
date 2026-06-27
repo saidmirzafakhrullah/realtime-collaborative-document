@@ -1,104 +1,134 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
-import { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
-import TiptapEditor from '@/Components/TiptapEditor';
+import { Head, router, usePage } from "@inertiajs/react";
+import axios from "axios";
+import { useEffect, useRef, useState } from "react";
+import ReactQuill from "react-quill";
 
-export default function Edit({ auth, document }) {
+import "react-quill/dist/quill.snow.css";
 
-    const [content, setContent] = useState(document.content);
+export default function Edit({ document }) {
+    const { auth } = usePage().props;
 
-    const timeoutRef = useRef(null);
+    const [content, setContent] = useState(document.content || "");
+    const [saving, setSaving] = useState(false);
+    const [remoteMouse, setRemoteMouse] = useState(null);
 
-    const isRemoteUpdate = useRef(false);
-
-    const saveDocument = (newContent) => {
-
-        setContent(newContent);
-
-        if (isRemoteUpdate.current) {
-            isRemoteUpdate.current = false;
-            return;
-        }
-
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
-
-        timeoutRef.current = setTimeout(async () => {
-
-            try {
-
-                await axios.put(`/documents/${document.id}`, {
-                    title: document.title,
-                    content: newContent,
-                });
-
-            } catch (error) {
-
-                console.error(error);
-
-            }
-
-        }, 1000);
-
-    };
+    const channelRef = useRef(null);
+    const remoteUpdate = useRef(false);
+    const saveTimer = useRef(null);
 
     useEffect(() => {
+        const channel = window.Echo.private(`document.${document.id}`);
 
-        const channel = window.Echo.channel(`document.${document.id}`);
+        channelRef.current = channel;
 
-        channel.listen('.document.updated', (e) => {
+        channel.listenForWhisper("typing", (event) => {
+            remoteUpdate.current = true;
+            setContent(event.content || "");
+        });
 
-            console.log('Realtime Update', e);
-
-            isRemoteUpdate.current = true;
-
-            setContent(e.content);
-
+        channel.listenForWhisper("mouse", (event) => {
+            setRemoteMouse(event);
         });
 
         return () => {
-
             window.Echo.leave(`document.${document.id}`);
-
         };
+    }, [document.id]);
 
-    }, []);
+    const sendMousePosition = (e) => {
+        channelRef.current?.whisper("mouse", {
+            x: e.clientX,
+            y: e.clientY,
+            name: auth.user.name,
+        });
+    };
+
+    const handleChange = (value, delta, source) => {
+        setContent(value);
+
+        if (remoteUpdate.current) {
+            remoteUpdate.current = false;
+            return;
+        }
+
+        if (source !== "user") return;
+
+        channelRef.current?.whisper("typing", {
+            content: value,
+        });
+
+        clearTimeout(saveTimer.current);
+
+        saveTimer.current = setTimeout(() => {
+            saveDocument(value);
+        }, 2000);
+    };
+
+    const saveDocument = async (latestContent) => {
+        setSaving(true);
+
+        await axios.put(`/documents/${document.id}`, {
+            content: latestContent,
+        });
+
+        setSaving(false);
+    };
 
     return (
-        <AuthenticatedLayout user={auth.user}>
-
+        <>
             <Head title={document.title} />
 
-            <div className="max-w-7xl mx-auto py-10 px-6">
+            <div className="editor-page" onMouseMove={sendMousePosition}>
+                <div className="editor-header">
+                    <div>
+                        <button
+                            className="back-btn"
+                            onClick={() => router.visit("/documents")}
+                        >
+                            ← Back
+                        </button>
 
-                <button
-                    onClick={() => history.back()}
-                    className="bg-black text-white px-5 py-2 rounded-lg"
-                >
-                    ← Back
-                </button>
+                        <h1>{document.title}</h1>
+                    </div>
 
-                <h1 className="text-4xl font-bold mt-8">
-                    {document.title}
-                </h1>
+                    <div>
+                        <button
+                            className="history-btn"
+                            onClick={() =>
+                                router.visit(
+                                    `/documents/${document.id}/versions`,
+                                )
+                            }
+                        >
+                            Version History
+                        </button>
 
-                <p className="text-gray-500 mt-2">
-                    Realtime Collaborative Document
-                </p>
-
-                <div className="mt-8">
-
-                    <TiptapEditor
-                        content={content}
-                        onChange={saveDocument}
-                    />
-
+                        <span className="save-status">
+                            {saving ? "Saving..." : "Saved"}
+                        </span>
+                    </div>
                 </div>
 
-            </div>
+                <div className="editor-wrapper">
+                    <ReactQuill
+                        theme="snow"
+                        value={content}
+                        onChange={handleChange}
+                    />
+                </div>
 
-        </AuthenticatedLayout>
+                {remoteMouse && (
+                    <div
+                        className="remote-mouse"
+                        style={{
+                            left: remoteMouse.x,
+                            top: remoteMouse.y,
+                        }}
+                    >
+                        <span>{remoteMouse.name}</span>
+                    </div>
+                )}
+            </div>
+        </>
     );
 }

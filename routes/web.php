@@ -34,6 +34,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/documents/{document}', [DocumentController::class, 'update'])
         ->name('documents.update');
 
+    Route::post('/documents/{document}/broadcast', [DocumentController::class, 'broadcast'])
+        ->name('documents.broadcast');
+
+    Route::get('/documents/{document}/versions', [DocumentController::class, 'versions'])
+        ->name('documents.versions');
+
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])
         ->name('profile.edit');

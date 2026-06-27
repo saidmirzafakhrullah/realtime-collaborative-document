@@ -1,115 +1,107 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, router, usePage, Link } from "@inertiajs/react";
+import { useState } from "react";
 
-export default function Index({ auth, documents }) {
+export default function Index({ documents }) {
+    const { auth } = usePage().props;
 
-    const { data, setData, post, processing } = useForm({
-        title: '',
-    });
+    const [title, setTitle] = useState("");
+    const [search, setSearch] = useState("");
 
-    const submit = (e) => {
-        e.preventDefault();
+    const createDocument = () => {
+        if (!title) return;
 
-        post(route('documents.store'), {
-            onSuccess: () => {
-                setData('title', '');
-            },
+        router.post("/documents", {
+            title,
         });
+
+        setTitle("");
     };
 
+    const filteredDocuments = documents.filter((doc) =>
+        doc.title.toLowerCase().includes(search.toLowerCase()),
+    );
+
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
+            <Head title="Documents" />
 
-            <Head title="My Documents" />
+            <div className="dashboard">
+                <div className="dashboard-header">
+                    <div>
+                        <h1>My Documents</h1>
+                        <p>Create and collaborate in real-time</p>
+                    </div>
 
-            <div className="max-w-7xl mx-auto py-10 px-6">
+                    <div className="dashboard-user">
+                        <div className="user-badge">
+                            {auth.user.name.charAt(0).toUpperCase()}
+                        </div>
 
-                <h1 className="text-4xl font-bold">
-                    My Documents
-                </h1>
+                        <span>{auth.user.name}</span>
 
-                <p className="text-gray-500 mt-2">
-                    Create and collaborate in real-time
-                </p>
+                        <Link
+                            href={route("logout")}
+                            method="post"
+                            as="button"
+                            className="logout-btn"
+                        >
+                            Logout
+                        </Link>
+                    </div>
+                </div>
 
-                <form
-                    onSubmit={submit}
-                    className="mt-10 flex gap-4"
-                >
-
+                <div className="dashboard-top">
                     <input
                         type="text"
                         placeholder="Search documents..."
-                        className="flex-1 rounded-lg border px-4 py-3"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
                     />
 
-                    <input
-                        type="text"
-                        placeholder="Document title..."
-                        value={data.title}
-                        onChange={(e) =>
-                            setData('title', e.target.value)
-                        }
-                        className="w-72 rounded-lg border px-4 py-3"
-                    />
+                    <div className="create-box">
+                        <input
+                            type="text"
+                            placeholder="Document title..."
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                        />
 
-                    <button
-                        disabled={processing}
-                        className="rounded-lg bg-black px-6 py-3 text-white"
-                    >
-                        + New Document
-                    </button>
-
-                </form>
-
-                {/* List Documents */}
-
-                <div className="mt-10 space-y-4">
-
-                    {documents.length === 0 ? (
-
-                        <div className="rounded-lg border p-6 text-center text-gray-500">
-                            No documents yet.
-                        </div>
-
-                    ) : (
-
-                        documents.map((doc) => (
-
-                            <div
-                                key={doc.id}
-                                className="flex items-center justify-between rounded-lg border p-5 shadow-sm"
-                            >
-
-                                <div>
-
-                                    <h2 className="text-xl font-semibold">
-                                        {doc.title}
-                                    </h2>
-
-                                    <p className="text-sm text-gray-500">
-                                        Document ID : {doc.id}
-                                    </p>
-
-                                </div>
-
-                                <Link
-                                    href={route('documents.edit', doc.id)}
-                                    className="rounded-lg bg-blue-600 px-5 py-2 text-white"
-                                >
-                                    Open
-                                </Link>
-
-                            </div>
-
-                        ))
-
-                    )}
-
+                        <button onClick={createDocument}>+ New Document</button>
+                    </div>
                 </div>
 
-            </div>
+                <div className="document-grid">
+                    {filteredDocuments.map((doc) => (
+                        <div
+                            key={doc.id}
+                            className="document-card"
+                            onClick={() =>
+                                router.visit(`/documents/${doc.id}/edit`)
+                            }
+                        >
+                            <h3>{doc.title}</h3>
 
-        </AuthenticatedLayout>
+                            <p>
+                                Created:{" "}
+                                {new Date(doc.created_at).toLocaleString()}
+                            </p>
+
+                            <button
+                                className="history-btn"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+
+                                    router.visit(
+                                        `/documents/${doc.id}/versions`,
+                                    );
+                                }}
+                            >
+                                Version History
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </>
     );
 }

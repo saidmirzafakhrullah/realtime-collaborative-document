@@ -4,28 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Events\DocumentUpdated;
 use App\Models\Document;
+use App\Models\DocumentVersion;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DocumentController extends Controller
 {
-    /**
-     * Menampilkan daftar dokumen.
-     */
     public function index()
     {
-        $documents = Document::where('user_id', auth()->id())
-            ->latest()
-            ->get();
-
         return Inertia::render('Documents/Index', [
-            'documents' => $documents,
+            'documents' => Document::latest()->get(),
         ]);
     }
 
-    /**
-     * Membuat dokumen baru.
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -33,17 +24,14 @@ class DocumentController extends Controller
         ]);
 
         $document = Document::create([
+            'user_id' => auth()->id(),
             'title' => $request->title,
             'content' => '',
-            'user_id' => auth()->id(),
         ]);
 
         return redirect()->route('documents.edit', $document);
     }
 
-    /**
-     * Membuka halaman editor.
-     */
     public function edit(Document $document)
     {
         return Inertia::render('Documents/Edit', [
@@ -51,26 +39,37 @@ class DocumentController extends Controller
         ]);
     }
 
-    /**
-     * Menyimpan perubahan dokumen.
-     */
+   public function broadcast(Request $request, Document $document)
+{
+    broadcast(new DocumentUpdated($document, $request->content))->toOthers();
+
+    return response()->json([
+        'success' => true,
+    ]);
+}
     public function update(Request $request, Document $document)
     {
-        $request->validate([
-            'title' => 'nullable|string|max:255',
-            'content' => 'nullable|string',
-        ]);
-
         $document->update([
-            'title' => $request->title ?? $document->title,
-            'content' => $request->content ?? '',
+            'content' => $request->content,
         ]);
 
-        broadcast(new DocumentUpdated($document))->toOthers();
+        DocumentVersion::create([
+            'document_id' => $document->id,
+            'content' => $request->content,
+        ]);
 
         return response()->json([
-            'success' => true,
+            'message' => 'Saved',
+        ]);
+    }
+
+    public function versions(Document $document)
+    {
+        return Inertia::render('Documents/Versions', [
             'document' => $document,
+            'versions' => DocumentVersion::where('document_id', $document->id)
+                ->latest()
+                ->get(),
         ]);
     }
 }
