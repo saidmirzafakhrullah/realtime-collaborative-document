@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import TiptapEditor from '@/Components/TiptapEditor';
 
@@ -8,19 +8,63 @@ export default function Edit({ auth, document }) {
 
     const [content, setContent] = useState(document.content);
 
-    const saveDocument = async (newContent) => {
+    const timeoutRef = useRef(null);
+
+    const isRemoteUpdate = useRef(false);
+
+    const saveDocument = (newContent) => {
 
         setContent(newContent);
 
-        try {
-            await axios.put(`/documents/${document.id}`, {
-                title: document.title,
-                content: newContent,
-            });
-        } catch (error) {
-            console.error(error);
+        if (isRemoteUpdate.current) {
+            isRemoteUpdate.current = false;
+            return;
         }
+
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
+
+        timeoutRef.current = setTimeout(async () => {
+
+            try {
+
+                await axios.put(`/documents/${document.id}`, {
+                    title: document.title,
+                    content: newContent,
+                });
+
+            } catch (error) {
+
+                console.error(error);
+
+            }
+
+        }, 1000);
+
     };
+
+    useEffect(() => {
+
+        const channel = window.Echo.channel(`document.${document.id}`);
+
+        channel.listen('.document.updated', (e) => {
+
+            console.log('Realtime Update', e);
+
+            isRemoteUpdate.current = true;
+
+            setContent(e.content);
+
+        });
+
+        return () => {
+
+            window.Echo.leave(`document.${document.id}`);
+
+        };
+
+    }, []);
 
     return (
         <AuthenticatedLayout user={auth.user}>
@@ -40,10 +84,18 @@ export default function Edit({ auth, document }) {
                     {document.title}
                 </h1>
 
-                <TiptapEditor
-                    content={content}
-                    onChange={saveDocument}
-                />
+                <p className="text-gray-500 mt-2">
+                    Realtime Collaborative Document
+                </p>
+
+                <div className="mt-8">
+
+                    <TiptapEditor
+                        content={content}
+                        onChange={saveDocument}
+                    />
+
+                </div>
 
             </div>
 

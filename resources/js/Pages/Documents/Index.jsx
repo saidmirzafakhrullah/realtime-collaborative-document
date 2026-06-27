@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 
 export default function Index({ auth, documents }) {
 
@@ -9,11 +9,17 @@ export default function Index({ auth, documents }) {
 
     const submit = (e) => {
         e.preventDefault();
-        post(route('documents.store'));
+
+        post(route('documents.store'), {
+            onSuccess: () => {
+                setData('title', '');
+            },
+        });
     };
 
     return (
         <AuthenticatedLayout user={auth.user}>
+
             <Head title="My Documents" />
 
             <div className="max-w-7xl mx-auto py-10 px-6">
@@ -55,6 +61,52 @@ export default function Index({ auth, documents }) {
                     </button>
 
                 </form>
+
+                {/* List Documents */}
+
+                <div className="mt-10 space-y-4">
+
+                    {documents.length === 0 ? (
+
+                        <div className="rounded-lg border p-6 text-center text-gray-500">
+                            No documents yet.
+                        </div>
+
+                    ) : (
+
+                        documents.map((doc) => (
+
+                            <div
+                                key={doc.id}
+                                className="flex items-center justify-between rounded-lg border p-5 shadow-sm"
+                            >
+
+                                <div>
+
+                                    <h2 className="text-xl font-semibold">
+                                        {doc.title}
+                                    </h2>
+
+                                    <p className="text-sm text-gray-500">
+                                        Document ID : {doc.id}
+                                    </p>
+
+                                </div>
+
+                                <Link
+                                    href={route('documents.edit', doc.id)}
+                                    className="rounded-lg bg-blue-600 px-5 py-2 text-white"
+                                >
+                                    Open
+                                </Link>
+
+                            </div>
+
+                        ))
+
+                    )}
+
+                </div>
 
             </div>
 

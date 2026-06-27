@@ -26,6 +26,7 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
+        "@tiptap/extension-collaboration": "^3.27.1",
         "@tiptap/pm": "^3.27.1",
         "@tiptap/react": "^3.27.1",
         "@tiptap/starter-kit": "^3.27.1",
