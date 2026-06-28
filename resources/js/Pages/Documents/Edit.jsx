@@ -12,23 +12,51 @@ export default function Edit({ document }) {
     const [saving, setSaving] = useState(false);
     const [remoteMouse, setRemoteMouse] = useState(null);
 
+    const [onlineUsers, setOnlineUsers] = useState([]);
+    const [typingUsers, setTypingUsers] = useState({});
+
     const channelRef = useRef(null);
     const remoteUpdate = useRef(false);
     const saveTimer = useRef(null);
 
     useEffect(() => {
-        const channel = window.Echo.private(`document.${document.id}`);
+        const channel = window.Echo.join(`document.${document.id}`);
 
         channelRef.current = channel;
+        channel
+            .here((users) => {
+                setOnlineUsers(users);
+            })
+            .joining((user) => {
+                setOnlineUsers((prev) => [...prev, user]);
+            })
+            .leaving((user) => {
+                setOnlineUsers((prev) =>
+                    prev.filter((u) => u.id !== user.id)
+                );
+            });
 
         channel.listenForWhisper("typing", (event) => {
-            remoteUpdate.current = true;
+         remoteUpdate.current = true;
             setContent(event.content || "");
+
+            setTypingUsers((prev) => ({
+                ...prev,
+                [event.id]: event.name,
+            }));
+
+            setTimeout(() => {
+                setTypingUsers((prev) => {
+                    const users = { ...prev };
+                    delete users[event.id];
+                    return users;
+                });
+            }, 5000);
         });
 
         channel.listenForWhisper("mouse", (event) => {
-            setRemoteMouse(event);
-        });
+        setRemoteMouse(event);
+    });
 
         return () => {
             window.Echo.leave(`document.${document.id}`);
@@ -37,6 +65,7 @@ export default function Edit({ document }) {
 
     const sendMousePosition = (e) => {
         channelRef.current?.whisper("mouse", {
+            id: auth.user.id,
             x: e.clientX,
             y: e.clientY,
             name: auth.user.name,
@@ -55,6 +84,8 @@ export default function Edit({ document }) {
 
         channelRef.current?.whisper("typing", {
             content: value,
+            id: auth.user.id,
+            name: auth.user.name,
         });
 
         clearTimeout(saveTimer.current);
@@ -108,7 +139,38 @@ export default function Edit({ document }) {
                         </span>
                     </div>
                 </div>
+                <div
+    style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: "20px",
+    }}
+>
+                <div>
+                    <h3>🟢 Online ({onlineUsers.length})</h3>
 
+                    {onlineUsers.map((user) => (
+                        <div key={user.id}>
+                            🟢 {user.name}
+                        </div>
+                    ))}
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                        {Object.values(typingUsers).map((name) => (
+                            <p
+                                key={name}
+                                style={{
+                                    color: "#16a34a",
+                                    fontWeight: "bold",
+                                }}
+                            >
+                                ⌨️ {name} sedang mengetik...
+                            </p>
+                        ))}
+                    </div>
+                </div>
                 <div className="editor-wrapper">
                     <ReactQuill
                         theme="snow"
